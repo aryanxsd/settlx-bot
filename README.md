@@ -67,6 +67,7 @@ Polling Worker (worker.js, every 30–60s)
      ├── dedupe alerts
      └── send Telegram alerts
 
+
  # Project Struct:
 settlx-bot/
 ├── index.js          # Express server + Telegram webhook
@@ -78,6 +79,7 @@ settlx-bot/
 ├── schema.sql        # Database schema
 ├── README.md
 ├── .gitignore
+
 
 
 # Database Schema (Logic):
