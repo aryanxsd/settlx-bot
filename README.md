@@ -6,7 +6,7 @@ It performs heuristic wallet risk checks and wallet activity tracking with alert
 This project intentionally avoids paid AML providers and heavy indexing, focusing on clarity, explainability, and low cost, as required.
 
 ✨ Features
-1️⃣ Wallet Risk Check (/check)
+# Wallet Risk Check (/check)
 
 Heuristic AML-style risk score (0–100)
 
@@ -18,7 +18,7 @@ Recent activity snapshot
 
 Blockchain explorer link
 
-2️⃣ Wallet Tracking & Alerts (/tracking)
+ # Wallet Tracking & Alerts (/tracking)
 
 Track wallets with thresholds
 
@@ -28,13 +28,13 @@ Cursor-based polling
 
 Deduplication to avoid duplicate alerts
 
-3️⃣ Demo & Live Modes
+# Demo & Live Modes
 
 Demo mode to simulate alerts (safe for restricted environments)
 
 Live mode to poll real blockchains
 
-🌐 Supported Chains
+# Supported Chains
 
 Ethereum
 
@@ -44,7 +44,7 @@ Avalanche
 
 Solana
 
-🧠 High-Level Architecture:
+# High-Level Architecture:
 Telegram User
      │
      ▼
@@ -67,7 +67,7 @@ Polling Worker (worker.js, every 30–60s)
      ├── dedupe alerts
      └── send Telegram alerts
 
-📦 Project Struct:
+ # Project Struct:
 settlx-bot/
 ├── index.js          # Express server + Telegram webhook
 ├── telegram.js       # Telegram message handling
@@ -80,7 +80,7 @@ settlx-bot/
 ├── .gitignore
 
 
-🗄️ Database Schema (Logic):
+# Database Schema (Logic):
 users
 
 Stores Telegram users.
@@ -245,25 +245,22 @@ Sends alerts only on real activity
 
 Same logic as demo mode
 
-📦 # Deliverables
-1️⃣ Running Bot + Setup Instructions
-Prerequisites
 
-Node.js ≥ 18
+# Setup & Run (Step-by-Step)
 
-PostgreSQL ≥ 14
+This section explains how to set up, run, stop, and restart the bot on a local machine.
 
-Telegram Bot Token
-
-Public RPC endpoints (ETH / Base / Avalanche / Solana)
-
-Setup
+🔹 PART 1: Initial Setup (Run Once)
+Step 1️⃣ Clone the repository
 git clone <repository>
 cd settlx-bot
+
+Step 2️⃣ Install dependencies
 npm install
 
+Step 3️⃣ Create .env file
 
-Create .env:
+Create a file named .env in the project root:
 
 BOT_TOKEN=<telegram_bot_token>
 
@@ -275,33 +272,132 @@ SOL_RPC=https://api.mainnet-beta.solana.com
 DEMO_MODE=true
 
 
-Create database:
+⚠️ Never commit .env to GitHub.
+
+Step 4️⃣ Create PostgreSQL database
+
+Open PostgreSQL:
 
 psql -U postgres
+
+
+Run:
+
 CREATE DATABASE settlx;
 CREATE USER settlx_user WITH PASSWORD 'password';
 GRANT ALL PRIVILEGES ON DATABASE settlx TO settlx_user;
 
 
-Load schema:
+Exit:
 
+\q
+
+Step 5️⃣ Load database schema
 psql -h localhost -U settlx_user -d settlx -f schema.sql
 
-Run the Bot
 
-Start Telegram webhook server:
+✅ Database setup complete.
 
-node index.js
+🔹 PART 2: Run the Bot (Local)
+
+You need 3 terminal windows/tabs.
+
+Step 6️⃣ Start the Telegram bot server
+
+Terminal 1
+
+cd ~/settlx-bot
+NODE_OPTIONS="--dns-result-order=ipv4first" node index.js
 
 
-Start polling worker:
+Expected output:
 
+Telegram bot server running on port 3000
+
+Step 7️⃣ Start the tracking worker
+
+Terminal 2
+
+cd ~/settlx-bot
 NODE_OPTIONS="--dns-result-order=ipv4first" node worker.js
+
+
+Expected output:
+
+Tracking worker started...
+
+Step 8️⃣ Start Cloudflare tunnel (for webhook)
+
+Terminal 3
+
+cloudflared tunnel --url http://localhost:3000
+
+
+You will see a public URL like:
+
+https://abcd.trycloudflare.com
+
+Step 9️⃣ Set Telegram webhook (IMPORTANT)
+
+Replace values and run:
+
+curl "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://abcd.trycloudflare.com/telegram/webhook"
+
+
+Expected response:
+
+{"ok":true,"result":true,"description":"Webhook was set"}
+
+
+✅ The bot is now fully operational.
+
+🔹 PART 3: How to Run Again (After Laptop Restart)
+
+When you shut down your laptop:
+
+Node processes stop
+
+Cloudflare tunnel stops
+
+Webhook URL expires
+
+Follow these steps to restart.
+
+Step 1️⃣ Open terminal
+cd ~/settlx-bot
+
+Step 2️⃣ Start bot server
+
+Terminal 1
+
+NODE_OPTIONS="--dns-result-order=ipv4first" node index.js
+
+Step 3️⃣ Start worker
+
+Terminal 2
+
+cd ~/settlx-bot
+NODE_OPTIONS="--dns-result-order=ipv4first" node worker.js
+
+Step 4️⃣ Start Cloudflare tunnel
+
+Terminal 3
+
+cloudflared tunnel --url http://localhost:3000
+
+
+Copy the new URL shown.
+
+Step 5️⃣ Update Telegram webhook
+
+Run (with new URL):
+
+curl "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://NEW_URL.trycloudflare.com/telegram/webhook"
 
 
 The bot is now fully operational.
 
-2️⃣ Postman / cURL Examples
+# Postman / cURL Examples
 Set Telegram Webhook
 curl "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=<PUBLIC_URL>/telegram/webhook"
 
@@ -354,7 +450,7 @@ Example response:
   }
 ]
 
-3️⃣ Design Explanation (Short)
+# Design Explanation (Short)
 Polling Approach
 
 A background worker runs every 30–60 seconds.
