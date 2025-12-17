@@ -154,8 +154,11 @@ async function runWorker() {
     await runLiveWorker();
 
   } catch (err) {
-    console.error("Worker error:", err.message);
-  }
+  console.error("Worker error:", err);
+  console.error("Message:", err?.message);
+  console.error("Stack:", err?.stack);
+}
+
 }
 
 setInterval(runWorker, 60000);
