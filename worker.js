@@ -1,20 +1,65 @@
 const { sendMessage } = require("./telegram");
 const { ethers } = require("ethers");
-const { Connection, PublicKey } = require("@solana/web3.js");
 const https = require("https");
 const db = require("./db");
 require("dotenv").config();
 
 /**
- * Force IPv4 (important for your environment)
+ * Force IPv4 (important for Railway / VPS)
  */
 const agent = new https.Agent({ family: 4 });
+
+/**
+ * ===== ENSURE DATABASE SCHEMA =====
+ * This runs once safely and prevents ALL "relation does not exist" crashes
+ */
+async function ensureSchema() {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      telegram_user_id BIGINT UNIQUE NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS tracked_addresses (
+      id SERIAL PRIMARY KEY,
+      telegram_user_id BIGINT NOT NULL,
+      address TEXT NOT NULL,
+      chain TEXT NOT NULL,
+      label TEXT,
+      min_amount NUMERIC DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      last_seen_cursor TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS alert_events (
+      id SERIAL PRIMARY KEY,
+      tracked_address_id INTEGER,
+      chain TEXT NOT NULL,
+      tx_hash_or_sig TEXT NOT NULL,
+      direction TEXT,
+      amount NUMERIC,
+      asset TEXT,
+      sent_to_telegram BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE (chain, tx_hash_or_sig, tracked_address_id)
+    );
+  `);
+}
 
 /**
  * ===== DEMO MODE =====
  * NOTHING RPC-RELATED IS TOUCHED HERE
  */
 async function runDemoOnce() {
+  // Ensure tables exist
+  await ensureSchema();
+
   const exists = await db.query(
     "SELECT 1 FROM alert_events WHERE tx_hash_or_sig='DEMO_TX'"
   );
@@ -25,7 +70,10 @@ async function runDemoOnce() {
   }
 
   const users = await db.query("SELECT telegram_user_id FROM users LIMIT 1");
-  if (users.rows.length === 0) return;
+  if (users.rows.length === 0) {
+    console.log("No Telegram users found, skipping demo");
+    return;
+  }
 
   await sendMessage(
     users.rows[0].telegram_user_id,
@@ -51,7 +99,7 @@ https://etherscan.io/tx/DEMO_TX`
 }
 
 /**
- * ===== LIVE PROVIDERS (CREATED ONLY IN LIVE MODE) =====
+ * ===== LIVE PROVIDERS =====
  */
 function evmProvider(rpc) {
   return new ethers.JsonRpcProvider(rpc, undefined, {
@@ -63,6 +111,8 @@ function evmProvider(rpc) {
  * ===== LIVE WORKER =====
  */
 async function runLiveWorker() {
+  await ensureSchema();
+
   const CHAINS = [
     { name: "eth", rpc: process.env.ETH_RPC },
     { name: "base", rpc: process.env.BASE_RPC },
@@ -70,6 +120,8 @@ async function runLiveWorker() {
   ];
 
   for (const chain of CHAINS) {
+    if (!chain.rpc) continue;
+
     const provider = evmProvider(chain.rpc);
     const latestBlock = await provider.getBlockNumber();
 
@@ -154,11 +206,10 @@ async function runWorker() {
     await runLiveWorker();
 
   } catch (err) {
-  console.error("Worker error:", err);
-  console.error("Message:", err?.message);
-  console.error("Stack:", err?.stack);
-}
-
+    console.error("Worker error:", err);
+    console.error("Message:", err?.message);
+    console.error("Stack:", err?.stack);
+  }
 }
 
 setInterval(runWorker, 60000);
